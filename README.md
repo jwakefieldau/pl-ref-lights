@@ -19,7 +19,7 @@ I had previously built a software-based system, using Bluetooth controllers, but
     - The relays live in an 8-channel relay module, which itself is powered by 12VDC, 2 relays are unused/spare.
     - The relay board has additional electronics such as flyback diodes, which prevent inductive load due to "back EMF" from relay actuation from damaging the Arduino.
 - Power is supplied by a **regulated** 12VDC 2.5A "plug pack".
-    - a 1-female to 4-male splitter, each of which is connected to 2 further splitters, is used to distribute this power within the base box.
+    - a 1-female to 4-male splitter, two of which are connected to 2 further splitters, is used to distribute this power within the base box.
     - The 8 male plugs in use - 1 Arduino, 1 relay board, 6 lights (via relays) are plugged into female-to-screw-terminal plugs, allowing separate routing of positive and ground wires.
     - The Arduino is connected via its on-board barrel jack, and runs at 5V via its on-board voltage regulator.
     - The relay board is connected via Arduino jumper wires, one for positive, one for ground.
