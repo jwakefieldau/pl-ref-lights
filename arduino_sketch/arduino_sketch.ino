@@ -1,16 +1,16 @@
-
-// not using pin 8 because of stupid overcrowding
-//TODO - change these once we have ribbons/breakouts
+//NOTE - we avoid pin 13 because has an onboard LED and pulldown resistor hanging off of it
+//meaning it always reads LOW even when the switch is closed
 int min_button_pin = 6;
-int max_button_pin = 13;
+int max_button_pin = 12;
 
-int l_r_button_pin = 6;
-int l_w_button_pin = 7;
+int l_w_button_pin = 6;
+int l_r_button_pin = 7;
+int h_w_button_pin = 8;
 int h_r_button_pin = 9;
-int h_w_button_pin = 10;
-int h_clr_button_pin = 11;
+int h_clr_button_pin = 10;
+int r_w_button_pin = 11;
 int r_r_button_pin = 12;
-int r_w_button_pin = 13;
+
 
 int light_states[3];
 int l_light_state_pos = 0;
@@ -23,7 +23,7 @@ int fired_lights = 0;
 
 int is_decision_complete(int *light_states);
 void clear_light_states(int *light_states);
-void set_light_state_from_button(int *light_states, int button_pin);
+int set_light_state_from_button(int *light_states, int button_pin);
 void print_light_states(int *light_states);
 
 int is_decision_complete(int *light_states) {
@@ -42,33 +42,40 @@ void clear_light_states(int *light_states) {
   Serial.println("CLR");
 }
 
-void set_light_state_from_button(int *light_states, int button_pin) {
+int set_light_state_from_button(int *light_states, int button_pin) {
 
   //write light state from button state only if that light state is OFF
   if (light_states[l_light_state_pos] == OFF) {
     if (button_pin == l_r_button_pin) {
       light_states[l_light_state_pos] = RED;
+      return 1;
     }
     if (button_pin == l_w_button_pin) {
       light_states[l_light_state_pos] = WHITE;
+      return 1;
     }
   }
   if (light_states[h_light_state_pos] == OFF) {
     if (button_pin == h_r_button_pin) {
       light_states[h_light_state_pos] = RED;
+      return 1;
     }
     if (button_pin == h_w_button_pin) {
       light_states[h_light_state_pos] = WHITE;
+      return 1;
     }
   }
   if (light_states[r_light_state_pos] == OFF) {
     if (button_pin == r_r_button_pin) {
       light_states[r_light_state_pos] = RED;
+      return 1;
     }
     if (button_pin == r_w_button_pin) {
       light_states[r_light_state_pos] = WHITE;
+      return 1;
     }
   }
+  return 0;
 }
 
 void print_light_states(int *light_states) {
@@ -96,6 +103,9 @@ void setup() {
   // when circuit is closed, it goes low
   for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
     pinMode(button_pin, INPUT_PULLUP);
+    Serial.print("Set INPUT_PULLUP for button ");
+    Serial.print(button_pin);
+    Serial.print('\n');
   }
 
   // setup initial light states
@@ -115,10 +125,9 @@ void loop() {
     for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
       // button closed: state LOW due to pullup
       if (button_pin != h_clr_button_pin && digitalRead(button_pin) == LOW) {
-
-        //TEMP DEBUG
-        if (button_pin == l_r_button_pin || button_pin == h_r_button_pin || button_pin == r_r_button_pin) {
-          set_light_state_from_button(light_states, button_pin);
+        // only print light state if we changed state, we can get a few
+        // reads per press
+        if (set_light_state_from_button(light_states, button_pin)) {
           print_light_states(light_states);
         }
       }
@@ -136,7 +145,7 @@ void loop() {
     }
  
     //if the clear button is closed, clear light states and turn relays off
-    if (digitalRead(h_clr_button_pin) == LOW) {
+    if (digitalRead(h_clr_button_pin) == LOW && fired_lights) {
       clear_light_states(light_states);
 
       //TODO - turn relays off
