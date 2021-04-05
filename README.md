@@ -4,7 +4,14 @@ Powerlifting referee lights, light automatically when decision complete, Arduino
 Gyms running powerlifting comps need light systems, and I wanted an electronics project that was challenging but achievable given my limited experience with electronics.  Many gyms use a simple circuit, master switch-based system with domestic electrical light wiring parts, which does not strictly satisfy the requirement of illuminating lights all together when a complete decision is entered.
 
 I had previously built a software-based system, using Bluetooth controllers, but the code was quite large and complex, and Bluetooth proved an unwieldy nightmware to work with.  This is a much more stable, simple, reliable system.
-## System description
+## System overview
+- The heart of the system is an Arduino Uno, which implements all of the logic and signalling.
+- The referees' hand controls consist of 4-leg tactile momentary switches mounted on plastic "jiffy" boxes, connected to cat5e jacks.
+- The hand controls connect to the base station via cat5/6 cables.
+- The lights are 6 automobile side marker LED lights (3 white, 3 red), capable of running with 10-30VDC, powered by 12VDC.
+- The lights are switched by an 8-channel relay module, controlled by the Arduino.
+- 
+## System description (this got a bit detailed, move this out to other sections)
 - The heart of the system is an Arduino Uno, which implements all of the logic and signalling.
 - The referees submit decisions via 4-leg tactile momentary switches mounted on plastic "jiffy" boxes, connected to cat5e jacks.
     - Using cat5e jacks allows cat5-6 cables of the required length to be used to connect the referees' hand controls to the base box.
