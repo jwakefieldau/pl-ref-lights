@@ -50,7 +50,7 @@ For all large-quantity items that are cheap per-unit, I recommend buying plenty 
     - black
 - >= 20 male to male Arduino jumper wires, with square-shaped plug housing
     - I recommend getting loads of these so that you have the lengths and colours you need/want
-    - in theory, if you didn't want to test your switches and hand controller jacks on a breadboard, you could just use hookup wire for those; the bare minimum is 8 wires terminated male on one end, to plug into the Arduino.  
+    - in theory, if you didn't want to test your switches and hand controller jacks on a breadboard, you could just use any hookup wire thin enough to fit the keystone jacks for those; the bare minimum is 8 wires terminated male on one end, to plug into the Arduino.  
     - rounded plug housing is ok for breadboard testing, but they cannot fit in large numbers next to one another on the Arduino.
 - >= 8 male to female Arduino jumper wires, with square-shaped plug housing
     - Again, get loads of these, for the same reasons as above.
