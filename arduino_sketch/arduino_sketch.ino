@@ -1,3 +1,15 @@
+//NOTE we avoid using pins 0 and 1 because it's RX/TX for serial
+// remember right is left from the back
+int min_relay_pin = A0;
+int max_relay_pin = A5;
+
+int r_r_relay_pin = A0;
+int r_w_relay_pin = A1;
+int h_r_relay_pin = A2;
+int h_w_relay_pin = A3;
+int l_r_relay_pin = A4;
+int l_w_relay_pin = A5;
+
 //NOTE - we avoid pin 13 because has an onboard LED and pulldown resistor hanging off of it
 //meaning it always reads LOW even when the switch is closed
 int min_button_pin = 6;
@@ -78,6 +90,55 @@ int set_light_state_from_button(int *light_states, int button_pin) {
   return 0;
 }
 
+void set_lights_from_states(int *light_states) {
+  for (int light_pos = 0; light_pos <= 2; light_pos++) {
+    if ((light_states[light_pos] == RED) || (light_states[light_pos] == OFF)) {
+      if (light_pos == l_light_state_pos) {
+        digitalWrite(l_w_relay_pin, LOW);    
+      }
+      if (light_pos == h_light_state_pos) {
+        digitalWrite(h_w_relay_pin, LOW);
+      }
+      if (light_pos == r_light_state_pos) {
+        digitalWrite(r_w_relay_pin, LOW);
+      }
+    }
+    if ((light_states[light_pos] == WHITE) || (light_states[light_pos] == OFF)) {
+      if (light_pos == l_light_state_pos) {
+        digitalWrite(l_r_relay_pin, LOW);    
+      }
+      if (light_pos == h_light_state_pos) {
+        digitalWrite(h_r_relay_pin, LOW);
+      }
+      if (light_pos == r_light_state_pos) {
+        digitalWrite(r_r_relay_pin, LOW);
+      }
+    }
+    if (light_states[light_pos] == RED) {
+      if (light_pos == l_light_state_pos) {
+        digitalWrite(l_r_relay_pin, HIGH);    
+      }
+      if (light_pos == h_light_state_pos) {
+        digitalWrite(h_r_relay_pin, HIGH);
+      }
+      if (light_pos == r_light_state_pos) {
+        digitalWrite(r_r_relay_pin, HIGH);
+      }
+    }
+    if (light_states[light_pos] == WHITE) {
+      if (light_pos == l_light_state_pos) {
+        digitalWrite(l_w_relay_pin, HIGH);    
+      }
+      if (light_pos == h_light_state_pos) {
+        digitalWrite(h_w_relay_pin, HIGH);
+      }
+      if (light_pos == r_light_state_pos) {
+        digitalWrite(r_w_relay_pin, HIGH);
+      }
+    }
+  }
+}
+
 void print_light_states(int *light_states) {
   for (int light_pos = 0; light_pos <= 2; light_pos++) {
     if (light_states[light_pos] == RED) {
@@ -93,10 +154,106 @@ void print_light_states(int *light_states) {
   Serial.print('\n');
 }
 
+void lights_test_pattern(int *light_states) {
+
+  //first test - RWR, leave it for 5s
+  light_states[l_light_state_pos] = RED;
+  light_states[h_light_state_pos] = WHITE;
+  light_states[r_light_state_pos] = RED;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+
+  //second test - WRW, 5s
+  light_states[l_light_state_pos] = WHITE;
+  light_states[h_light_state_pos] = RED;
+  light_states[r_light_state_pos] = WHITE;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+
+  //third test - RRR, 5s
+  light_states[l_light_state_pos] = RED;
+  light_states[h_light_state_pos] = RED;
+  light_states[r_light_state_pos] = RED;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+
+  //fourth test, WWW, 5s
+  light_states[l_light_state_pos] = WHITE;
+  light_states[h_light_state_pos] = WHITE;
+  light_states[r_light_state_pos] = WHITE;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+
+  //fifth test, RRW, 5s
+  light_states[l_light_state_pos] = RED;
+  light_states[h_light_state_pos] = RED;
+  light_states[r_light_state_pos] = WHITE;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+
+  //sixth test, WWR, 5s
+  light_states[l_light_state_pos] = WHITE;
+  light_states[h_light_state_pos] = WHITE;
+  light_states[r_light_state_pos] = RED;
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(5000);
+
+  //clear, leave for 1s
+  clear_light_states(light_states);
+  set_lights_from_states(light_states);
+  print_light_states(light_states);
+  delay(1000);
+  
+}
+
 void setup() {
   // put your setup code here, to run once:
 
   Serial.begin(9600);
+
+  // setup relay output pins
+  for (int relay_pin = min_relay_pin; relay_pin <= max_relay_pin; relay_pin++) {
+    pinMode(relay_pin, OUTPUT);
+    Serial.print("Set OUTPUT for relay ");
+    Serial.print(relay_pin);
+    Serial.print('\n');
+  }
 
   // setup button input pins - use internal pullup resistors
   // this means when circuit is open, pin is pulled high, and
@@ -112,8 +269,17 @@ void setup() {
   clear_light_states(light_states);
   print_light_states(light_states);
 
-  // setup relay pins
-  //TODO - pin mode output and write them low to turn lights off
+
+  // set initial relay state from light state
+  set_lights_from_states(light_states);
+
+  //go through a test pattern
+  lights_test_pattern(light_states);
+
+  //back to initial
+  clear_light_states(light_states);
+  print_light_states(light_states);
+  set_lights_from_states(light_states);
 
 }
 
@@ -138,18 +304,14 @@ void loop() {
     // make sure we only fire relays once per decision
     if (!fired_lights) {
       print_light_states(light_states);
-      
-      //TODO - turn relays on
-      
+      set_lights_from_states(light_states);
       fired_lights = 1;
     }
  
     //if the clear button is closed, clear light states and turn relays off
     if (digitalRead(h_clr_button_pin) == LOW && fired_lights) {
       clear_light_states(light_states);
-
-      //TODO - turn relays off
-
+      set_lights_from_states(light_states);
       fired_lights = 0;
    }
  }
