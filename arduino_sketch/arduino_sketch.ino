@@ -15,13 +15,13 @@ int l_w_relay_pin = A5;
 int min_button_pin = 6;
 int max_button_pin = 12;
 
-int l_w_button_pin = 6;
-int l_r_button_pin = 7;
-int h_w_button_pin = 8;
-int h_r_button_pin = 9;
+int r_r_button_pin = 6;
+int r_w_button_pin = 7;
+int h_r_button_pin = 8;
+int h_w_button_pin = 9;
 int h_clr_button_pin = 10;
-int r_w_button_pin = 11;
-int r_r_button_pin = 12;
+int l_r_button_pin = 11;
+int l_w_button_pin = 12;
 
 
 int light_states[3];
