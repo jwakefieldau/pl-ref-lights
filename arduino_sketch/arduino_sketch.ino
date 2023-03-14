@@ -15,7 +15,7 @@ int min_relay_pin = A0;
 int max_relay_pin = A5;
 
 //NOTE - we avoid pin 13 because has an onboard LED and pulldown resistor hanging off of it
-//meaning it always reads LOW even when the switch is closed
+//meaning it always reads LOW
 int min_button_pin = 6;
 int max_button_pin = 12;
 
@@ -29,7 +29,8 @@ int CLEAR = 3;
 int lights_fired = 0;
 
 // how many consecutive reads of the same state do we need
-// to acknowledge?
+// to acknowledge?  this is what seems to be the sweet spot for
+// picking up quick button presses and avoiding phantom reads
 int BUTTON_READ_THRESHOLD = 3;
 
 struct ref refs[3];
@@ -51,6 +52,7 @@ void update_ref_from_button_read(struct ref *refs, int button_pin) {
       new_button_state = CLEAR;
     }
     else {
+      // didn't match any pins for this ref, try next
       continue;
     }
     
@@ -61,7 +63,9 @@ void update_ref_from_button_read(struct ref *refs, int button_pin) {
     }
     refs[ref_i].button_consec_count += 1;
 
-    // if we got enough button reads, update decision state    
+    // if we got enough reads of the same button from the same ref, 
+    // update decision state.  we use this threshold to ignore the
+    // occasional phantom read    
     if (refs[ref_i].button_consec_count >= BUTTON_READ_THRESHOLD) {
       refs[ref_i].decision_state = refs[ref_i].button_state;
       Serial.print("DECISION STATE:REF:");
@@ -109,7 +113,7 @@ void set_lights(struct ref *refs) {
       digitalWrite(refs[ref_i].w_relay_pin, HIGH);
       Serial.print("RELAY ON:REF:");
       Serial.print(ref_i);
-      Serial.println("R"); 
+      Serial.println("W"); 
     }
     if (refs[ref_i].decision_state == OFF) {
       digitalWrite(refs[ref_i].r_relay_pin, LOW);
@@ -135,6 +139,9 @@ void setup(void) {
   // setup button input pins - use internal pullup resistors
   // this means when circuit is open, pin is pulled high, and
   // when circuit is closed, it goes low
+  // note that we can get phantom button reads, maybe due to EMI and 
+  // pullup resistor values not being exactly right?  this is mitigated
+  // in update_ref_from_button_read()
   for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
     pinMode(button_pin, INPUT_PULLUP);
     Serial.print("Set INPUT_PULLUP for button ");
@@ -142,7 +149,7 @@ void setup(void) {
     Serial.print('\n');
   }
 
-  refs[0] = {
+  refs[l_pos] = {
     11,
     12,
     -1,
@@ -152,7 +159,7 @@ void setup(void) {
     OFF,
     0
   };
-  refs[1] = {
+  refs[h_pos] = {
     8,
     9,  
     10,
@@ -162,7 +169,7 @@ void setup(void) {
     OFF,
     0
   };
-  refs[2] = {
+  refs[r_pos] = {
     6,
     7,
     -1,
@@ -197,7 +204,7 @@ void loop(void) {
 
   // if the head ref cleared, turn the lights off and 
   // clear ref button and decision states
-  if (refs[h_pos].button_state == CLEAR) {
+  if (refs[h_pos].decision_state == CLEAR) {
     clear_refs(refs);
     set_lights(refs);
     lights_fired = 0;        
