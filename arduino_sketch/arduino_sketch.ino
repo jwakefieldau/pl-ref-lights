@@ -1,285 +1,126 @@
+struct ref {
+  int r_button_pin;
+  int w_button_pin;
+  int clr_button_pin;
+  int r_relay_pin;
+  int w_relay_pin;
+  int decision_state;
+  int button_state;
+  int button_consec_count;        
+};
+
 //NOTE we avoid using pins 0 and 1 because it's RX/TX for serial
 // remember right is left from the back
 int min_relay_pin = A0;
 int max_relay_pin = A5;
-
-int r_r_relay_pin = A5;
-int r_w_relay_pin = A4;
-int h_r_relay_pin = A3;
-int h_w_relay_pin = A2;
-int l_r_relay_pin = A1;
-int l_w_relay_pin = A0;
 
 //NOTE - we avoid pin 13 because has an onboard LED and pulldown resistor hanging off of it
 //meaning it always reads LOW even when the switch is closed
 int min_button_pin = 6;
 int max_button_pin = 12;
 
-int r_r_button_pin = 6;
-int r_w_button_pin = 7;
-int h_r_button_pin = 8;
-int h_w_button_pin = 9;
-int h_clr_button_pin = 10;
-int l_r_button_pin = 11;
-int l_w_button_pin = 12;
-
-
-int light_states[3];
-int l_light_state_pos = 0;
-int h_light_state_pos = 1;
-int r_light_state_pos = 2;
+int l_pos = 0;
+int h_pos = 1;
+int r_pos = 2;
 int OFF = 0;
 int RED = 1;
 int WHITE = 2;
-int fired_lights = 0;
+int CLEAR = 3;
+int lights_fired = 0;
 
 // how many consecutive reads of the same state do we need
 // to acknowledge?
 int BUTTON_READ_THRESHOLD = 3;
-int button_consec_reads[3];
-int button_states[3];
 
-int is_decision_complete(int *light_states);
-void clear_light_and_button_states(int *light_states);
-int set_light_state_from_button(int *light_states, int button_pin);
-void print_light_states(int *light_states);
+struct ref refs[3];
 
-int is_decision_complete(int *light_states) {
-  for (int light_pos = 0; light_pos <= 2; light_pos++) {
-    if (light_states[light_pos] == OFF) {
+void update_ref_from_button_read(struct ref *refs, int button_pin) {
+  
+  // find the ref and button state from the pin
+  for (int ref_i = 0; ref_i < 3; ref_i++) {
+
+    int new_button_state;    
+
+    if (button_pin == refs[ref_i].r_button_pin) {
+      new_button_state = RED;
+    }
+    else if (button_pin == refs[ref_i].w_button_pin) {
+      new_button_state = WHITE;
+    }
+    else if (button_pin == refs[ref_i].clr_button_pin) {
+      new_button_state = CLEAR;
+    }
+    else {
+      continue;
+    }
+    
+    // update the ref button state if necc
+    if (refs[ref_i].button_state != new_button_state) {
+      refs[ref_i].button_state = new_button_state;
+      refs[ref_i].button_consec_count = 0;
+    }
+    refs[ref_i].button_consec_count += 1;
+
+    // if we got enough button reads, update decision state    
+    if (refs[ref_i].button_consec_count >= BUTTON_READ_THRESHOLD) {
+      refs[ref_i].decision_state = refs[ref_i].button_state;
+      Serial.print("DECISION STATE:REF:");
+      Serial.print(ref_i);
+      Serial.print(":");
+      Serial.print(refs[ref_i].decision_state);
+      Serial.print("\n");
+    }
+  }    
+}
+
+int is_decision_complete(struct ref *refs) {
+  for (int ref_i = 0; ref_i < 3; ref_i++) {
+    if ((refs[ref_i].decision_state != RED) && (refs[ref_i].decision_state != WHITE)) {
       return 0;
     }
   }
+  Serial.print("DECISION:");
+  for (int ref_i = 0; ref_i < 3; ref_i++) {
+    Serial.print(refs[ref_i].decision_state);
+  }
+  Serial.print("\n");
   return 1;
 }
 
-void clear_light_and_button_states(int *light_states, int *button_states, int *button_consec_reads) {
-  for (int light_pos = 0; light_pos <= 2; light_pos++) {
-    light_states[light_pos] = OFF;
-    button_states[light_pos] = OFF;
-    button_consec_reads[light_pos] = 0;
+void clear_refs(struct ref *refs) {
+  for (int ref_i = 0; ref_i < 3; ref_i++) {
+    refs[ref_i].button_state = OFF;
+    refs[ref_i].button_consec_count = 0;
+    refs[ref_i].decision_state = OFF;
+    Serial.print("CLEAR REF:");
+    Serial.println(ref_i);
   }
 }
 
-int set_button_check_threshold(int *button_states, int *button_consec_reads, int pos, int check_state) {
-  if (button_states[pos] == check_state) {
-    button_consec_reads[pos] += 1;
-    if (button_consec_reads[pos] >= BUTTON_READ_THRESHOLD) {
-      return 1;
+void set_lights(struct ref *refs) {
+  for (int ref_i = 0; ref_i < 3; ref_i++) {
+    if (refs[ref_i].decision_state == RED) {
+      digitalWrite(refs[ref_i].r_relay_pin, HIGH);
+      Serial.print("RELAY ON:REF:");
+      Serial.print(ref_i);
+      Serial.println("R");   
     }
-  } else {
-    button_states[pos] = check_state;
-    button_consec_reads[pos] = 1;
+    if (refs[ref_i].decision_state == WHITE) {
+      digitalWrite(refs[ref_i].w_relay_pin, HIGH);
+      Serial.print("RELAY ON:REF:");
+      Serial.print(ref_i);
+      Serial.println("R"); 
+    }
+    if (refs[ref_i].decision_state == OFF) {
+      digitalWrite(refs[ref_i].r_relay_pin, LOW);
+      digitalWrite(refs[ref_i].w_relay_pin, LOW);
+      Serial.print("RELAYS OFF:REF:");
+      Serial.println(ref_i);
+    }    
   }
-  return 0;
 }
 
-//TODO - rewrite using button threshold logic
-int set_light_state_from_button(int *light_states, int *button_states, int *button_consec_reads, int button_pin) {
-
-  //write light state from button state only if that light state is OFF
-  if (light_states[l_light_state_pos] == OFF) {
-    if ((button_pin == l_r_button_pin) && set_button_check_threshold(button_states, button_consec_reads, l_light_state_pos, RED)) {
-      light_states[l_light_state_pos] = RED;
-      return 1;
-    }
-    if ((button_pin == l_w_button_pin) && set_button_check_threshold(button_states, button_consec_reads, l_light_state_pos, WHITE)) {
-      light_states[l_light_state_pos] = WHITE;
-      return 1;
-    }
-  }
-  if (light_states[h_light_state_pos] == OFF) {
-    if ((button_pin == h_r_button_pin) && set_button_check_threshold(button_states, button_consec_reads, h_light_state_pos, RED)) {
-      light_states[h_light_state_pos] = RED;
-      return 1;
-    }
-    if ((button_pin == h_w_button_pin) && set_button_check_threshold(button_states, button_consec_reads, h_light_state_pos, WHITE)) {
-      light_states[h_light_state_pos] = WHITE;
-      return 1;
-    }
-  }
-  if (light_states[r_light_state_pos] == OFF) {
-    if ((button_pin == r_r_button_pin) && set_button_check_threshold(button_states, button_consec_reads, r_light_state_pos, RED)) {
-      light_states[r_light_state_pos] = RED;
-      return 1;
-    }
-    if ((button_pin == r_w_button_pin) && set_button_check_threshold(button_states, button_consec_reads, r_light_state_pos, WHITE)) {
-      light_states[r_light_state_pos] = WHITE;
-      return 1;
-    }
-  }
-  return 0;
-}
-
-void set_lights_from_states(int *light_states) {
-  Serial.print("RELAY SET:");  
-  for (int light_pos = 0; light_pos <= 2; light_pos++) {
-    if ((light_states[light_pos] == RED) || (light_states[light_pos] == OFF)) {
-      if (light_pos == l_light_state_pos) {
-        digitalWrite(l_w_relay_pin, LOW);
-        Serial.print("LW:OFF:");            
-      }
-      if (light_pos == h_light_state_pos) {
-        digitalWrite(h_w_relay_pin, LOW);
-        Serial.print("HW:OFF:");        
-      }
-      if (light_pos == r_light_state_pos) {
-        digitalWrite(r_w_relay_pin, LOW);
-        Serial.print("RW:OFF:");        
-      }
-    }
-    if ((light_states[light_pos] == WHITE) || (light_states[light_pos] == OFF)) {
-      if (light_pos == l_light_state_pos) {
-        digitalWrite(l_r_relay_pin, LOW);
-        Serial.print("LR:OFF:");    
-      }
-      if (light_pos == h_light_state_pos) {
-        digitalWrite(h_r_relay_pin, LOW);
-        Serial.print("HR:OFF:");
-      }
-      if (light_pos == r_light_state_pos) {
-        digitalWrite(r_r_relay_pin, LOW);
-        Serial.print("RR:OFF:");
-      }
-    }
-    if (light_states[light_pos] == RED) {
-      if (light_pos == l_light_state_pos) {
-        digitalWrite(l_r_relay_pin, HIGH);
-        Serial.print("LR:ON:");    
-      }
-      if (light_pos == h_light_state_pos) {
-        digitalWrite(h_r_relay_pin, HIGH);
-        Serial.print("HR:ON:");
-      }
-      if (light_pos == r_light_state_pos) {
-        digitalWrite(r_r_relay_pin, HIGH);
-        Serial.print("RR:ON:");
-      }
-    }
-    if (light_states[light_pos] == WHITE) {
-      if (light_pos == l_light_state_pos) {
-        digitalWrite(l_w_relay_pin, HIGH);
-        Serial.print("LW:ON:");    
-      }
-      if (light_pos == h_light_state_pos) {
-        digitalWrite(h_w_relay_pin, HIGH);
-        Serial.print("HW:ON:");
-      }
-      if (light_pos == r_light_state_pos) {
-        digitalWrite(r_w_relay_pin, HIGH);
-        Serial.print("RW:ON:");
-      }
-    }
-  }
-  Serial.print("\n");
-}
-
-void print_light_states(int *light_states) {
-  Serial.print("LIGHT STATE:");
-  for (int light_pos = 0; light_pos <= 2; light_pos++) {
-    if (light_states[light_pos] == RED) {
-      Serial.print('R');
-    }
-    if (light_states[light_pos] == WHITE) {
-      Serial.print('W');  
-    }
-    if (light_states[light_pos] == OFF) {
-      Serial.print('X');
-    }
-  }
-  Serial.print('\n');
-}
-
-void lights_test_pattern(int *light_states) {
-
-  //first test - RWR, leave it for 5s
-  light_states[l_light_state_pos] = RED;
-  light_states[h_light_state_pos] = WHITE;
-  light_states[r_light_state_pos] = RED;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-
-  //second test - WRW, 5s
-  light_states[l_light_state_pos] = WHITE;
-  light_states[h_light_state_pos] = RED;
-  light_states[r_light_state_pos] = WHITE;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-
-  //third test - RRR, 5s
-  light_states[l_light_state_pos] = RED;
-  light_states[h_light_state_pos] = RED;
-  light_states[r_light_state_pos] = RED;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-
-  //fourth test, WWW, 5s
-  light_states[l_light_state_pos] = WHITE;
-  light_states[h_light_state_pos] = WHITE;
-  light_states[r_light_state_pos] = WHITE;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-
-  //fifth test, RRW, 5s
-  light_states[l_light_state_pos] = RED;
-  light_states[h_light_state_pos] = RED;
-  light_states[r_light_state_pos] = WHITE;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-
-  //sixth test, WWR, 5s
-  light_states[l_light_state_pos] = WHITE;
-  light_states[h_light_state_pos] = WHITE;
-  light_states[r_light_state_pos] = RED;
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(5000);
-
-  //clear, leave for 1s
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  set_lights_from_states(light_states);
-  print_light_states(light_states);
-  delay(1000);
-  
-}
-
-void setup() {
-  // put your setup code here, to run once:
+void setup(void) {
 
   Serial.begin(9600);
 
@@ -301,59 +142,64 @@ void setup() {
     Serial.print('\n');
   }
 
-  // setup initial light states
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  print_light_states(light_states);
-
-
-  // set initial relay state from light state
-  set_lights_from_states(light_states);
-
-  //go through a test pattern
-  lights_test_pattern(light_states);
-
-  //back to initial
-  clear_light_and_button_states(light_states, button_states, button_consec_reads);
-  print_light_states(light_states);
-  set_lights_from_states(light_states);
-
+  refs[0] = {
+    11,
+    12,
+    -1,
+    A1,
+    A0,
+    OFF,
+    OFF,
+    0
+  };
+  refs[1] = {
+    8,
+    9,  
+    10,
+    A3,
+    A2,
+    OFF,
+    OFF,
+    0
+  };
+  refs[2] = {
+    6,
+    7,
+    -1,
+    A5,
+    A4,
+    OFF,
+    OFF,
+    0
+  };
+  Serial.println("REFS INITIALISED");
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop(void) {
 
-  // if our decision isn't complete, poll the buttons except clear
-  if (!is_decision_complete(light_states)) {
-    for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
-      // button closed: state LOW due to pullup
-      int cur_button_pin_read = digitalRead(button_pin);
-      if (cur_button_pin_read == LOW) {
-        Serial.print("BUTTON PRESS PIN:");
-        Serial.println(button_pin);
-        if (button_pin != h_clr_button_pin) {
-          // only print light state if we changed state, we can get a few
-          // reads per press
-          if (set_light_state_from_button(light_states, button_states, button_consec_reads, button_pin)) {
-            print_light_states(light_states);
-          }
-        }
-      }
+  // poll ref input buttons
+  for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
+    int button_read = digitalRead(button_pin);
+    
+    //INPUT_PULLUP means button close makes the read LOW
+    if (button_read == LOW) {
+      Serial.print("BUTTON READ PIN:");
+      Serial.println(button_pin);
+      update_ref_from_button_read(refs, button_pin);      
     }
-  // decision complete - turn relays on and poll clear button   
-  } else {
+  }
 
-    // make sure we only fire relays once per decision
-    if (!fired_lights) {
-      print_light_states(light_states);
-      set_lights_from_states(light_states);
-      fired_lights = 1;
-    }
- 
-    //if the clear button is closed, clear light states and turn relays off
-    if (digitalRead(h_clr_button_pin) == LOW && fired_lights) {
-      clear_light_and_button_states(light_states, button_states, button_consec_reads);
-      set_lights_from_states(light_states);
-      fired_lights = 0;
-   }
- }
+  // if we have a complete decision and the lights haven't fired yet, do so
+  if ((!lights_fired) && (is_decision_complete(refs))) {
+    set_lights(refs);
+    lights_fired = 1;
+  }
+
+  // if the head ref cleared, turn the lights off and 
+  // clear ref button and decision states
+  if (refs[h_pos].button_state == CLEAR) {
+    clear_refs(refs);
+    set_lights(refs);
+    lights_fired = 0;        
+  }
 }
