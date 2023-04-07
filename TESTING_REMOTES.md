@@ -379,3 +379,5 @@ Raw data: 10616,388,992,384,996,380,996,380,1004,368,1004,372,1008,368,1012,364,
 # Testing simultaneous buttons different refs - jamming?
 
 nothing received unless button presses are about 0.3s apart
+
+
