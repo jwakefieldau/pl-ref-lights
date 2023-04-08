@@ -1,7 +1,12 @@
+#include <RCSwitch.h>
+
+RCSwitch rx = RCSwitch();
+int rx_int = 0; // interrupt 0, pin #2
+
 struct ref {
-  int r_button_pin;
-  int w_button_pin;
-  int clr_button_pin;
+  int r_button_code;
+  int w_button_code;
+  int clr_button_code;
   int r_relay_pin;
   int w_relay_pin;
   int decision_state;
@@ -14,11 +19,6 @@ struct ref {
 int min_relay_pin = A0;
 int max_relay_pin = A5;
 
-//NOTE - we avoid pin 13 because has an onboard LED and pulldown resistor hanging off of it
-//meaning it always reads LOW
-int min_button_pin = 6;
-int max_button_pin = 12;
-
 int l_pos = 0;
 int h_pos = 1;
 int r_pos = 2;
@@ -28,27 +28,29 @@ int WHITE = 2;
 int CLEAR = 3;
 int lights_fired = 0;
 
-// how many consecutive reads of the same state do we need
-// to acknowledge?  this is what seems to be the sweet spot for
-// picking up quick button presses and avoiding phantom reads
-int BUTTON_READ_THRESHOLD = 3;
+// we don't seem to have phantom reads with wireless, but we generally get 
+// 2 reads on a button press
+int BUTTON_READ_THRESHOLD = 2;
 
 struct ref refs[3];
 
-void update_ref_from_button_read(struct ref *refs, int button_pin) {
+void update_ref_from_button_read(struct ref *refs, int button_code) {
   
   // find the ref and button state from the pin
   for (int ref_i = 0; ref_i < 3; ref_i++) {
 
     int new_button_state;    
 
-    if (button_pin == refs[ref_i].r_button_pin) {
+    if (button_code == refs[ref_i].r_button_code) {
       new_button_state = RED;
     }
-    else if (button_pin == refs[ref_i].w_button_pin) {
+    else if (button_code == refs[ref_i].w_button_code) {
       new_button_state = WHITE;
     }
-    else if (button_pin == refs[ref_i].clr_button_pin) {
+    // just in case, ignore "clear" from a ref that has the placeholder value.  In theory
+    // a remote could default to -1 for the clear button; in wired systems they don't have 
+    // a clear button
+    else if ((button_code == refs[ref_i].clr_button_code) && (refs[ref_i].clr_button_code != -1)) {
       new_button_state = CLEAR;
     }
     else {
@@ -128,6 +130,11 @@ void setup(void) {
 
   Serial.begin(9600);
 
+  rx.enableReceive(rx_int); // interrupt 0, pin #2
+  Serial.print("Enabled receive for 433MhZ receiver on interrupt ");
+  Serial.print(rx_int);
+  Serial.print("\n");
+
   // setup relay output pins
   for (int relay_pin = min_relay_pin; relay_pin <= max_relay_pin; relay_pin++) {
     pinMode(relay_pin, OUTPUT);
@@ -136,22 +143,9 @@ void setup(void) {
     Serial.print('\n');
   }
 
-  // setup button input pins - use internal pullup resistors
-  // this means when circuit is open, pin is pulled high, and
-  // when circuit is closed, it goes low
-  // note that we can get phantom button reads, maybe due to EMI and 
-  // pullup resistor values not being exactly right?  this is mitigated
-  // in update_ref_from_button_read()
-  for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
-    pinMode(button_pin, INPUT_PULLUP);
-    Serial.print("Set INPUT_PULLUP for button ");
-    Serial.print(button_pin);
-    Serial.print('\n');
-  }
-
   refs[l_pos] = {
-    11,
-    12,
+    8194,
+    8196,
     -1,
     A1,
     A0,
@@ -160,9 +154,9 @@ void setup(void) {
     0
   };
   refs[h_pos] = {
-    8,
-    9,  
-    10,
+    4098,
+    4100,  
+    4097,
     A3,
     A2,
     OFF,
@@ -170,8 +164,8 @@ void setup(void) {
     0
   };
   refs[r_pos] = {
-    6,
-    7,
+    16386,
+    16388,
     -1,
     A5,
     A4,
@@ -184,17 +178,18 @@ void setup(void) {
 
 void loop(void) {
 
-  // poll ref input buttons
-  for (int button_pin = min_button_pin; button_pin <= max_button_pin; button_pin++) {
-    int button_read = digitalRead(button_pin);
-    
-    //INPUT_PULLUP means button close makes the read LOW
-    if (button_read == LOW) {
-      Serial.print("BUTTON READ PIN:");
-      Serial.println(button_pin);
-      update_ref_from_button_read(refs, button_pin);      
-    }
+  int ref_button_code = 0;
+
+  // get signal from radio
+  if (rx.available()) {
+    ref_button_code = rx.getReceivedValue();
+    rx.resetAvailable();
   }
+
+  // update ref state from what we read
+  if (ref_button_code != 0) {
+    update_ref_from_button_read(refs, ref_button_code);
+  }  
 
   // if we have a complete decision and the lights haven't fired yet, do so
   if ((!lights_fired) && (is_decision_complete(refs))) {
