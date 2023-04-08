@@ -11,7 +11,9 @@ void setup() {
 
   // these options from receive logs of remotes
   tx.setProtocol(1);
-  tx.setPulseLength(340);
+  // "native" pulse length of our remotes is 340ms, we can go as short as 150ms,
+  // which we want to, to reduce jamming
+  tx.setPulseLength(150); 
 
   // not sure now many repetitions we really need
   tx.setRepeatTransmit(1000);

@@ -380,4 +380,9 @@ Raw data: 10616,388,992,384,996,380,996,380,1004,368,1004,372,1008,368,1012,364,
 
 nothing received unless button presses are about 0.3s apart
 
+## reduce pulse length
+
+* Played higher-lower in programming remotes with different pulse lengths - 150ms is as short as I can go with these
+* Doesn't eliminate jamming but does reduce
+
 
